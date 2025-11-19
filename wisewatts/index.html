@@ -1,0 +1,65 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8"/>
+  <title>Sensor WS Client</title>
+  <style>
+    body { font-family: Arial, sans-serif; padding: 20px; }
+    pre { background:#f4f4f4; padding:10px; border-radius:6px; }
+  </style>
+</head>
+<body>
+  <h2>Sensor WebSocket Client</h2>
+  <div id="status">Disconnected</div>
+  <pre id="output">No data yet</pre>
+
+  <script>
+    const WS_URL = "ws://localhost:8000/ws/clients/"; // change host
+    let ws;
+    let reconnectDelay = 1000;
+
+    function connect() {
+      document.getElementById('status').textContent = 'Connecting...';
+      ws = new WebSocket(WS_URL);
+
+      ws.onopen = () => {
+        reconnectDelay = 1000;
+        document.getElementById('status').textContent = 'Connected';
+        // optionally send a message: ws.send(JSON.stringify({action: 'subscribe'}));
+      };
+      ws.onmessage = (evt) => {
+  try {
+    const msg = JSON.parse(evt.data);
+    console.log("raw message:", msg);   // helpful for debugging
+
+    // If server sends { type: "sensor", data: { ... } }
+    const payload = msg.data || msg;    // fallback: if no msg.data, use msg itself
+
+    const out = [
+      `timestamp: ${new Date().toLocaleTimeString()}`,
+      `sensor: ${JSON.stringify(payload)}`,       // whole object
+      
+      `pump_on: ${payload.pump_on}`
+    ].join('\n');
+
+    document.getElementById('output').textContent = out;
+  } catch (err) {
+    console.error('Invalid JSON', evt.data);
+  }
+};
+      ws.onclose = () => {
+        document.getElementById('status').textContent = `Disconnected — reconnecting in ${reconnectDelay/1000}s`;
+        setTimeout(connect, reconnectDelay);
+        // exponential backoff (cap at 30s)
+        reconnectDelay = Math.min(reconnectDelay * 1.5, 30000);
+      };
+
+      ws.onerror = (err) => {
+        console.error('WS error', err);
+      };
+    }
+
+    connect();
+  </script>
+</body>
+</html>
