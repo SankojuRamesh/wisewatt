@@ -5,7 +5,7 @@ import json
 from datetime import datetime
 import   random  
 
-SERVER = URL = "http://127.0.0.1:8000/api/sensor-post/" 
+SERVER = URL = "http://13.210.103.10:8000/api/sensor-post/" 
 
 def read_sensor():
     # replace with real sensor reading code

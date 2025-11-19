@@ -80,12 +80,24 @@ ASGI_APPLICATION = "wisewatts.asgi.application"
 # Database
 # https://docs.djangoproject.com/en/5.2/ref/settings/#databases
 
+# DATABASES = {
+#     'default': {
+#         'ENGINE': 'django.db.backends.sqlite3',
+#         'NAME': BASE_DIR / 'db.sqlite3',
+#     }
+# }
+
+
 DATABASES = {
-    'default': {
-        'ENGINE': 'django.db.backends.sqlite3',
-        'NAME': BASE_DIR / 'db.sqlite3',
-    }
-}
+            'default': {
+                'ENGINE': 'django.db.backends.mysql',
+                'NAME': 'your_database_name',  # Name of your MySQL database
+                'USER': 'your_mysql_user',      # MySQL username
+                'PASSWORD': 'your_mysql_password', # MySQL password
+                'HOST': 'localhost',            # Or the IP address/hostname of your MySQL server
+                'PORT': '3306',                 # Default MySQL port
+            }
+        }
 
 
 # Password validation

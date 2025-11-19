@@ -45,7 +45,7 @@ def sensor_post(request):
             "payload": payload
         }
     )
-    print("Broadcasted payload to websockets:", payload)
+   
     # --------- 2) save to DB at most every 1 minute ----------
     # adjust this depending on how you identify the sensor in your payload
     sensor_id = payload.get("sensor_id", None)  
