@@ -92,11 +92,13 @@ def _maybe_save_sensor_reading(sensor_id, payload):
         water_level_cm=payload.get("water_level_cm", 0),
         water_level_perc=payload.get("water_level_perc", 0)
     )
-    pump = Pump.objects.get( pk=payload.get("pump_id") )
-    pumpReading.objects.create(
-        pump=pump,  # assuming one pump per site 
-        pump_on=pump_on
-    )
+    for pump_obj in payload.get("pumps", []):
+        pump_on = pump_obj.get("pump_on", False)
+        pump = Pump.objects.get( pk=pump_obj.get("pump_id") )
+        pumpReading.objects.create(
+            pump=pump,  # assuming one pump per site 
+            pump_on=pump_on
+        )
 
 
     # remember last save time
@@ -152,3 +154,4 @@ class pumpReadingViewSet(viewsets.ModelViewSet):
     parser_classes = [JSONParser, FormParser, MultiPartParser]
     http_method_names = ['get' ]   # effectively read-only
     pagination_class= Pagination
+    ordering_fields = ['id'  ]
