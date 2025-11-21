@@ -1,65 +1,239 @@
 <!doctype html>
-<html>
+<html lang="en">
 <head>
-  <meta charset="utf-8"/>
-  <title>Sensor WS Client</title>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Live Sensors — WebSocket</title>
   <style>
-    body { font-family: Arial, sans-serif; padding: 20px; }
-    pre { background:#f4f4f4; padding:10px; border-radius:6px; }
+    body { font-family: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial; margin: 18px; color:#111; }
+    h1 { font-size: 20px; margin-bottom: 6px; }
+    #controls { display:flex; gap:8px; align-items:center; margin-bottom:12px; flex-wrap:wrap; }
+    input, button, select { padding:6px 8px; border-radius:6px; border:1px solid #ddd; font-size:14px; }
+    #status { padding:6px 8px; border-radius:6px; background:#f3f4f6; color:#111; font-weight:600; }
+    table { width:100%; border-collapse: collapse; margin-top:10px; }
+    th, td { padding:8px 10px; border-bottom:1px solid #eee; text-align:left; font-size:14px; }
+    th { background:#fafafa; font-weight:700; position: sticky; top:0; z-index:1; }
+    tr.updated { animation: flash 0.6s ease; }
+    @keyframes flash { from { background:#fff9db } to { background:transparent } }
+    #log { white-space:pre-wrap; background:#0f172a;color:#e6eef8; padding:10px; border-radius:8px; max-height:220px; overflow:auto; font-family: monospace; font-size:13px; }
+    .small { font-size:13px; color:#555; }
+    .badge { display:inline-block; padding:2px 6px; border-radius:6px; background:#eef2ff; color:#3730a3; font-weight:600; margin-left:6px; }
   </style>
 </head>
 <body>
-  <h2>Sensor WebSocket Client</h2>
-  <div id="status">Disconnected</div>
-  <pre id="output">No data yet</pre>
+  <h1>Live Sensors Dashboard</h1>
+  <div id="controls">
+    <div id="status">Status: <span id="conn">disconnected</span></div>
 
-  <script>
-    const WS_URL = "ws://13.210.103.10:8000/ws/clients/"; // change host
-    let ws;
-    let reconnectDelay = 1000;
+    <label class="small">WS URL:
+      <input id="wsUrl" style="width:380px" value="ws://13.210.103.10:8000/ws/clients/" />
+    </label>
 
-    function connect() {
-      document.getElementById('status').textContent = 'Connecting...';
-      ws = new WebSocket(WS_URL);
+    <button id="btnConnect">Connect</button>
+    <button id="btnDisconnect" disabled>Disconnect</button>
 
-      ws.onopen = () => {
-        reconnectDelay = 1000;
-        document.getElementById('status').textContent = 'Connected';
-        // optionally send a message: ws.send(JSON.stringify({action: 'subscribe'}));
-      };
-      ws.onmessage = (evt) => {
-  try {
-    const msg = JSON.parse(evt.data);
-    console.log("raw message:", msg);   // helpful for debugging
+    <label class="small">Filter sensor_id:
+      <input id="filterId" placeholder="leave empty for all" style="width:140px" />
+    </label>
 
-    // If server sends { type: "sensor", data: { ... } }
-    const payload = msg.data || msg;    // fallback: if no msg.data, use msg itself
+    <label class="small">
+      <input type="checkbox" id="showLog" checked /> Show log
+    </label>
 
-    const out = [
-      `timestamp: ${new Date().toLocaleTimeString()}`,
-      `sensor: ${JSON.stringify(payload)}`,       // whole object
-      
-      `pump_on: ${payload.pump_on}`
-    ].join('\n');
+    <div style="margin-left:auto">
+      <span class="small">Known sensors</span>
+      <span id="count" class="badge">0</span>
+    </div>
+  </div>
 
-    document.getElementById('output').textContent = out;
-  } catch (err) {
-    console.error('Invalid JSON', evt.data);
+  <table id="tblSensors">
+    <thead>
+      <tr>
+        <th style="width:110px">Sensor ID</th>
+        <th style="width:110px">Last Seen</th>
+        <th>Water Level (cm)</th>
+        <th>Distance (cm)</th>
+        <th>pump_on</th>
+        <th>raw payload</th>
+      </tr>
+    </thead>
+    <tbody></tbody>
+  </table>
+
+  <h3 style="margin-top:14px">Message Log</h3>
+  <div id="log" aria-live="polite"></div>
+
+<script>
+(() => {
+  const statusEl = document.getElementById('conn');
+  const urlInput = document.getElementById('wsUrl');
+  const btnConnect = document.getElementById('btnConnect');
+  const btnDisconnect = document.getElementById('btnDisconnect');
+  const filterInput = document.getElementById('filterId');
+  const showLogChk = document.getElementById('showLog');
+  const logEl = document.getElementById('log');
+  const tbody = document.querySelector('#tblSensors tbody');
+  const countBadge = document.getElementById('count');
+
+  let ws = null;
+  let reconnectDelay = 1000;
+  let reconnectTimer = null;
+  const sensors = new Map(); // sensor_id -> {rowEl, lastPayload}
+
+  function log(msg, type='info') {
+    const time = new Date().toLocaleTimeString();
+    if (!showLogChk.checked) return;
+    logEl.textContent = `[${time}] ${msg}\n` + logEl.textContent;
   }
-};
-      ws.onclose = () => {
-        document.getElementById('status').textContent = `Disconnected — reconnecting in ${reconnectDelay/1000}s`;
-        setTimeout(connect, reconnectDelay);
-        // exponential backoff (cap at 30s)
-        reconnectDelay = Math.min(reconnectDelay * 1.5, 30000);
-      };
 
-      ws.onerror = (err) => {
-        console.error('WS error', err);
-      };
+  function setStatus(s) {
+    statusEl.textContent = s;
+  }
+
+  function makeOrUpdateRow(sensorId, payload) {
+    const filter = filterInput.value.trim();
+    if (filter && filter !== String(sensorId)) return; // skip if filtered out
+
+    let entry = sensors.get(sensorId);
+    const now = new Date();
+    if (!entry) {
+      const tr = document.createElement('tr');
+      tr.dataset.sensorId = sensorId;
+      tr.innerHTML = `
+        <td class="sid"></td>
+        <td class="seen small"></td>
+        <td class="water"></td>
+        <td class="distance"></td>
+        <td class="pump small"></td>
+        <td class="raw small"></td>
+      `;
+      tbody.prepend(tr);
+      entry = { row: tr, payload: null, lastSeen: now };
+      sensors.set(sensorId, entry);
+      countBadge.textContent = sensors.size;
     }
+    entry.payload = payload;
+    entry.lastSeen = now;
 
-    connect();
-  </script>
+    // update cells
+    const r = entry.row;
+    r.querySelector('.sid').textContent = sensorId;
+    r.querySelector('.seen').textContent = now.toLocaleTimeString();
+    r.querySelector('.water').textContent = payload.water_level_cm ?? '—';
+    r.querySelector('.distance').textContent = payload.distance_cm ?? (payload.distance ?? '—');
+    r.querySelector('.pump').textContent = payload.pump_on ?? '—';
+    r.querySelector('.raw').textContent = JSON.stringify(payload);
+
+    // visual highlight
+    r.classList.remove('updated');
+    void r.offsetWidth;
+    r.classList.add('updated');
+  }
+
+  function handlePayload(payload) {
+    // payload may be an array or a single object
+    if (Array.isArray(payload)) {
+      log(`Received array (${payload.length})`);
+      payload.forEach(p => handleSingleSensor(p));
+    } else if (typeof payload === 'object' && payload !== null) {
+      handleSingleSensor(payload);
+    } else {
+      log(`Unexpected payload type: ${typeof payload}`);
+    }
+  }
+
+  function handleSingleSensor(s) {
+    // prefer sensor_id, fallback to id or name, or create unique id
+    const sensorId = s.sensor_id ?? s.id ?? s.name ?? ('unk-' + Math.random().toString(36).slice(2,8));
+    log(`Sensor ${sensorId} — pump_on:${s.pump_on ?? 'n/a'} — water:${s.water_level_cm ?? 'n/a'}`);
+    makeOrUpdateRow(sensorId, s);
+  }
+
+  function openSocket() {
+    const url = urlInput.value.trim();
+    if (!url) { alert('Please enter WebSocket URL'); return; }
+
+    // cleanup existing
+    if (ws) { ws.close(); ws = null; }
+
+    setStatus('connecting...');
+    try {
+      ws = new WebSocket(url);
+
+      ws.addEventListener('open', () => {
+        setStatus('connected');
+        reconnectDelay = 1000;
+        btnConnect.disabled = true;
+        btnDisconnect.disabled = false;
+        log('Connected to ' + url);
+      });
+
+      ws.addEventListener('message', (ev) => {
+        try {
+          const msg = JSON.parse(ev.data);
+          log('Raw message: ' + JSON.stringify(msg));
+          // some servers wrap payload in `data` property
+          const payload = msg.data ?? msg;
+          handlePayload(payload);
+        } catch (err) {
+          log('Invalid JSON received: ' + ev.data);
+        }
+      });
+
+      ws.addEventListener('close', (ev) => {
+        setStatus('disconnected');
+        btnConnect.disabled = false;
+        btnDisconnect.disabled = true;
+        log(`Socket closed (code=${ev.code}) — reconnecting in ${Math.round(reconnectDelay/1000)}s...`);
+        // schedule reconnect
+        if (reconnectTimer) clearTimeout(reconnectTimer);
+        reconnectTimer = setTimeout(() => {
+          reconnectTimer = null;
+          openSocket();
+          reconnectDelay = Math.min(reconnectDelay * 1.5, 30000);
+        }, reconnectDelay);
+      });
+
+      ws.addEventListener('error', (err) => {
+        log('Socket error: ' + (err.message || JSON.stringify(err)));
+      });
+
+    } catch (err) {
+      setStatus('error');
+      log('Failed to open socket: ' + err.message);
+    }
+  }
+
+  btnConnect.addEventListener('click', () => openSocket());
+  btnDisconnect.addEventListener('click', () => {
+    if (ws) {
+      ws.close();
+      ws = null;
+      setStatus('disconnected');
+      btnConnect.disabled = false;
+      btnDisconnect.disabled = true;
+      log('Manually disconnected');
+    }
+  });
+
+  filterInput.addEventListener('input', () => {
+    // simple re-render: remove rows that don't match filter, show matching
+    const filter = filterInput.value.trim();
+    Array.from(tbody.querySelectorAll('tr')).forEach(tr => {
+      const sid = tr.dataset.sensorId;
+      tr.style.display = (!filter || filter === sid) ? '' : 'none';
+    });
+  });
+
+  showLogChk.addEventListener('change', () => {
+    logEl.style.display = showLogChk.checked ? 'block' : 'none';
+  });
+
+  // auto connect on load
+  window.addEventListener('load', () => {
+    openSocket();
+  });
+})();
+</script>
 </body>
 </html>

@@ -14,7 +14,8 @@ from rest_framework.parsers import JSONParser, FormParser, MultiPartParser
 from .models import Site, Tank, Pump, Sensor, TankReading, pumpReading
 from .serializers import SiteSerializer, TankSerializer, PumpSerializer, SensorSerializer, TankReadingSerializer, pumpReadingSerializer
 from .filters import SiteFilter, TankFilter, PumpFilter, SensorFilter, TankReadingFilter, pumpReadingFilter 
-from django_filters.rest_framework import DjangoFilterBackend   
+from django_filters.rest_framework import DjangoFilterBackend 
+from .pagenation import Pagination  
 
 # ---------------------------
 
@@ -107,18 +108,21 @@ class SiteViewSet(viewsets.ModelViewSet):
     filterset_class = SiteFilter
     filter_backends = [DjangoFilterBackend]
     parser_classes = [JSONParser, FormParser, MultiPartParser]
+    pagination_class= Pagination
 class TankViewSet(viewsets.ModelViewSet):
     queryset = Tank.objects.all()
     serializer_class = TankSerializer
     filterset_class = TankFilter
     filter_backends = [DjangoFilterBackend]
     parser_classes = [JSONParser, FormParser, MultiPartParser]
+    pagination_class= Pagination
 class PumpViewSet(viewsets.ModelViewSet):
     queryset = Pump.objects.all()
     serializer_class = PumpSerializer
     filterset_class = PumpFilter
     filter_backends = [DjangoFilterBackend]
     parser_classes = [JSONParser, FormParser, MultiPartParser]
+    pagination_class= Pagination
 
 
 class SensorViewSet(viewsets.ModelViewSet):
@@ -127,6 +131,7 @@ class SensorViewSet(viewsets.ModelViewSet):
     filterset_class = SensorFilter
     filter_backends = [DjangoFilterBackend]
     parser_classes = [JSONParser, FormParser, MultiPartParser]
+    pagination_class= Pagination
 # Additional API views can be added here as needed
 
 class TankReadingViewSet(viewsets.ModelViewSet):
@@ -136,6 +141,7 @@ class TankReadingViewSet(viewsets.ModelViewSet):
     filterset_class = TankReadingFilter
     parser_classes = [JSONParser, FormParser, MultiPartParser]
     http_method_names = ['get' ]   # effectively read-only
+    pagination_class= Pagination
 
 
 class pumpReadingViewSet(viewsets.ModelViewSet):
@@ -145,3 +151,4 @@ class pumpReadingViewSet(viewsets.ModelViewSet):
     filterset_class = pumpReadingFilter
     parser_classes = [JSONParser, FormParser, MultiPartParser]
     http_method_names = ['get' ]   # effectively read-only
+    pagination_class= Pagination

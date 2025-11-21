@@ -20,7 +20,7 @@ ALLOWED_HOSTS = ['*']
 
 
 # Application definition
- 
+
 INSTALLED_APPS = [
     'django.contrib.admin',
     'django.contrib.auth',
@@ -28,17 +28,19 @@ INSTALLED_APPS = [
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
+    "corsheaders",
      'rest_framework',
      'django_filters',
       'channels', 
      'drf_yasg',
-     'corsheaders',
+    
     "flowboard",
    
 
 ]
 
 MIDDLEWARE = [
+     "corsheaders.middleware.CorsMiddleware",
     'django.middleware.security.SecurityMiddleware',
      "whitenoise.middleware.WhiteNoiseMiddleware",  
      'corsheaders.middleware.CorsMiddleware', 
@@ -50,7 +52,10 @@ MIDDLEWARE = [
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
 ]
 ASGI_APPLICATION = "wisewatts.asgi.application"
-
+CORS_ALLOW_ALL_ORIGINS = True
+CORS_ORIGIN_ALLOW_ALL = True
+CORS_ALLOW_HEADERS = ['*']
+CORS_ALLOW_METHODS = ['*']
 CHANNEL_LAYERS = {
     "default": {
         "BACKEND": "channels.layers.InMemoryChannelLayer"
@@ -80,24 +85,24 @@ ASGI_APPLICATION = "wisewatts.asgi.application"
 # Database
 # https://docs.djangoproject.com/en/5.2/ref/settings/#databases
 
-# DATABASES = {
-#     'default': {
-#         'ENGINE': 'django.db.backends.sqlite3',
-#         'NAME': BASE_DIR / 'db.sqlite3',
-#     }
-# }
-
-
 DATABASES = {
-            'default': {
-                'ENGINE': 'django.db.backends.mysql',
-                'NAME': 'your_database_name',  # Name of your MySQL database
-                'USER': 'your_mysql_user',      # MySQL username
-                'PASSWORD': 'your_mysql_password', # MySQL password
-                'HOST': 'localhost',            # Or the IP address/hostname of your MySQL server
-                'PORT': '3306',                 # Default MySQL port
-            }
-        }
+    'default': {
+        'ENGINE': 'django.db.backends.sqlite3',
+        'NAME': BASE_DIR / 'db.sqlite3',
+    }
+}
+
+
+# DATABASES = {
+#             'default': {
+#                 'ENGINE': 'django.db.backends.mysql',
+#                 'NAME': '',  # Name of your MySQL database
+#                 'USER': 'wisewatt',      # MySQL username
+#                 'PASSWORD': 'WiseWatt@123', # MySQL password
+#                 'HOST': 'localhost',            # Or the IP address/hostname of your MySQL server
+#                 'PORT': '3306',                 # Default MySQL port
+#             }
+#         }
 
 
 # Password validation

@@ -50,8 +50,8 @@ class Sensor(models.Model):
 class TankReading(models.Model):
     # id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     tank = models.ForeignKey(Tank, on_delete=models.CASCADE, related_name='tank_readings')
-    water_level_cm = models.FloatField()
-    water_level_perc = models.FloatField()
+    water_level_cm = models.CharField(max_length=20, default='0', null=True, blank=True  )
+    water_level_perc = models.CharField( max_length=20, default='0', null=True, blank=True  )
     timestamp = models.DateTimeField(default=timezone.now) 
     def __str__(self):
         return self.name
