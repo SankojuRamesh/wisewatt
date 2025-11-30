@@ -5,7 +5,7 @@ import json
 from datetime import datetime
 import random
 
-SERVER = "http://13.210.103.10:8000/api/sensor-post/"
+SERVER = "https://iotgateway.live/api/sensor-post/"
 
 # --- Configuration / defaults (edit these as needed) ---
 CFG_PUMP1_ID = "1"
